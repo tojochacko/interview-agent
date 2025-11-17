@@ -22,6 +22,11 @@ dependencies = [
 
     # Text-to-Speech (Phase 2)
     "pyttsx3>=2.90",
+
+    # Speech-to-Text (Phase 3)
+    "openai-whisper>=20231117",
+    "pyaudio>=0.2.13",
+    "numpy>=1.24.0,<2.0",
 ]
 
 [project.optional-dependencies]
