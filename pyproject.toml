@@ -1,0 +1,58 @@
+[project]
+name = "conversation-agent-v11"
+version = "0.1.0"
+description = "Testing conversational agents with multiple TTS system providers"
+requires-python = ">=3.9"
+dependencies = [
+    # Configuration management
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+
+    # CLI interface
+    "click>=8.1.0",
+
+    # HTTP client for API calls
+    "httpx>=0.25.0",
+
+    # Async support
+    "asyncio>=3.4.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=src --cov-report=term-missing"
