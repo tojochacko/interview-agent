@@ -16,9 +16,8 @@ import click
 
 from conversation_agent.config import ExportConfig, STTConfig, TTSConfig
 from conversation_agent.core import InterviewOrchestrator, export_interview
+from conversation_agent.core.audio import AudioManager
 from conversation_agent.core.pdf_parser import PDFQuestionParser
-from conversation_agent.providers.stt import WhisperProvider
-from conversation_agent.providers.tts import Pyttsx3Provider
 from conversation_agent.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -118,8 +117,8 @@ def start(
 
         # Initialize providers
         click.echo("\nInitializing speech systems...")
-        tts_provider = Pyttsx3Provider(tts_config)
-        stt_provider = WhisperProvider(stt_config)
+        tts_provider = tts_config.get_provider()
+        stt_provider = stt_config.get_provider()
 
         # Configure export
         export_config = ExportConfig()
@@ -244,7 +243,7 @@ def config(show_tts: bool, show_stt: bool, show_all: bool) -> None:
             # Show available voices
             click.echo("\nAvailable voices:")
             try:
-                tts_provider = Pyttsx3Provider(tts_config)
+                tts_provider = tts_config.get_provider()
                 voices = tts_provider.list_voices()
                 for i, voice in enumerate(voices[:10], 1):  # Show first 10
                     click.echo(f"  {i}. {voice}")
@@ -349,7 +348,7 @@ def test_audio(tts_test: bool, stt_test: bool, test_all: bool) -> None:
             click.echo("Initializing TTS system...")
 
             tts_config = TTSConfig()
-            tts_provider = Pyttsx3Provider(tts_config)
+            tts_provider = tts_config.get_provider()
 
             test_message = "Hello! This is a test of the text to speech system."
             click.echo(f"\nSpeaking: '{test_message}'")
@@ -370,7 +369,7 @@ def test_audio(tts_test: bool, stt_test: bool, test_all: bool) -> None:
             click.echo("Initializing STT system (this may take a moment)...")
 
             stt_config = STTConfig()
-            stt_provider = WhisperProvider(stt_config)
+            stt_provider = stt_config.get_provider()
 
             click.echo("\nMicrophone test:")
             click.echo("When you're ready, speak a short phrase (e.g., 'Hello world')")
@@ -382,11 +381,20 @@ def test_audio(tts_test: bool, stt_test: bool, test_all: bool) -> None:
 
             click.echo("\n🎤 Recording... (speak now, then wait for silence)")
 
-            response = stt_provider.listen()
+            # Use AudioManager to record audio
+            audio_manager = AudioManager()
+            audio_data = audio_manager.record_until_silence()
 
-            if response and response.text:
-                click.echo(f"\n✓ Transcription: '{response.text}'")
-                click.echo(f"  Confidence: {response.confidence:.2f}")
+            # Transcribe the recorded audio
+            result = stt_provider.transcribe_audio_data(
+                audio_data, audio_manager.get_sample_rate()
+            )
+
+            if result and result.get("text"):
+                text = result["text"]
+                confidence = result.get("confidence", 0.0)
+                click.echo(f"\n✓ Transcription: '{text}'")
+                click.echo(f"  Confidence: {confidence:.2f}")
 
                 if not click.confirm("\nIs the transcription accurate?", default=True):
                     click.echo("\nTroubleshooting tips:")

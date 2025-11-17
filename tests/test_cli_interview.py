@@ -13,7 +13,7 @@ import pytest
 from click.testing import CliRunner
 
 from conversation_agent.cli.interview import cli
-from conversation_agent.models import InterviewSession, Question, Response
+from conversation_agent.models import InterviewSession, Question
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def mock_pdf_parser():
 @pytest.fixture
 def mock_tts_provider():
     """Mock TTS provider."""
-    with patch("conversation_agent.cli.interview.Pyttsx3Provider") as mock:
+    with patch("conversation_agent.config.tts_config.TTSConfig.get_provider") as mock:
         provider = MagicMock()
         provider.list_voices.return_value = ["Voice 1", "Voice 2", "Voice 3"]
         mock.return_value = provider
@@ -55,13 +55,24 @@ def mock_tts_provider():
 @pytest.fixture
 def mock_stt_provider():
     """Mock STT provider."""
-    with patch("conversation_agent.cli.interview.WhisperProvider") as mock:
+    with patch("conversation_agent.config.stt_config.STTConfig.get_provider") as mock:
         provider = MagicMock()
-        provider.listen.return_value = Response(
-            text="Hello world",
-            confidence=0.95,
-        )
+        provider.transcribe_audio_data.return_value = {
+            "text": "Hello world",
+            "confidence": 0.95,
+        }
         mock.return_value = provider
+        yield mock
+
+
+@pytest.fixture
+def mock_audio_manager():
+    """Mock AudioManager."""
+    with patch("conversation_agent.cli.interview.AudioManager") as mock:
+        manager = MagicMock()
+        manager.record_until_silence.return_value = b"fake_audio_data"
+        manager.get_sample_rate.return_value = 16000
+        mock.return_value = manager
         yield mock
 
 
@@ -217,8 +228,9 @@ class TestStartCommand:
             input="y\n",
         )
 
+        # Verify TTS provider was initialized via get_provider()
         assert mock_tts_provider.called
-        # TTSConfig should have rate=200
+        # TTSConfig should have rate=200 set before calling get_provider()
 
     @patch("conversation_agent.cli.interview.export_interview")
     def test_start_with_stt_model_option(
@@ -371,12 +383,15 @@ class TestTestAudioCommand:
 
         assert result.exit_code == 0
         assert "TESTING TEXT-TO-SPEECH" in result.output
+        # Verify get_provider() was called and the returned provider's speak() was called
+        assert mock_tts_provider.called
         assert mock_tts_provider.return_value.speak.called
 
     def test_test_audio_stt(
         self,
         cli_runner: CliRunner,
         mock_stt_provider: Mock,
+        mock_audio_manager: Mock,
     ):
         """Test STT audio test."""
         result = cli_runner.invoke(
@@ -387,7 +402,8 @@ class TestTestAudioCommand:
 
         assert result.exit_code == 0
         assert "TESTING SPEECH-TO-TEXT" in result.output
-        assert mock_stt_provider.return_value.listen.called
+        assert mock_audio_manager.return_value.record_until_silence.called
+        assert mock_stt_provider.return_value.transcribe_audio_data.called
         assert "Transcription:" in result.output
         assert "Hello world" in result.output
 
@@ -396,6 +412,7 @@ class TestTestAudioCommand:
         cli_runner: CliRunner,
         mock_tts_provider: Mock,
         mock_stt_provider: Mock,
+        mock_audio_manager: Mock,
     ):
         """Test all audio systems."""
         result = cli_runner.invoke(
@@ -407,14 +424,18 @@ class TestTestAudioCommand:
         assert result.exit_code == 0
         assert "TESTING TEXT-TO-SPEECH" in result.output
         assert "TESTING SPEECH-TO-TEXT" in result.output
+        # Verify both providers were used
+        assert mock_tts_provider.called
         assert mock_tts_provider.return_value.speak.called
-        assert mock_stt_provider.return_value.listen.called
+        assert mock_audio_manager.return_value.record_until_silence.called
+        assert mock_stt_provider.return_value.transcribe_audio_data.called
 
     def test_test_audio_default_tests_all(
         self,
         cli_runner: CliRunner,
         mock_tts_provider: Mock,
         mock_stt_provider: Mock,
+        mock_audio_manager: Mock,
     ):
         """Test that no flags tests all audio systems."""
         result = cli_runner.invoke(
@@ -432,8 +453,13 @@ class TestTestAudioCommand:
         cli_runner: CliRunner,
     ):
         """Test STT when no speech is detected."""
-        with patch("conversation_agent.cli.interview.WhisperProvider") as mock_stt:
-            mock_stt.return_value.listen.return_value = None
+        with patch("conversation_agent.config.stt_config.STTConfig.get_provider") as mock_stt, \
+             patch("conversation_agent.cli.interview.AudioManager") as mock_audio:
+            # Mock AudioManager
+            mock_audio.return_value.record_until_silence.return_value = b"fake_audio"
+            mock_audio.return_value.get_sample_rate.return_value = 16000
+            # Mock STT to return None/empty result
+            mock_stt.return_value.transcribe_audio_data.return_value = None
 
             result = cli_runner.invoke(
                 cli,
