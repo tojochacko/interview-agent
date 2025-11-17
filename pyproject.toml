@@ -29,6 +29,9 @@ dependencies = [
     "numpy>=1.24.0,<2.0",
 ]
 
+[project.scripts]
+interview = "conversation_agent.cli:cli"
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.1.0",
