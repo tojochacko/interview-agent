@@ -17,7 +17,6 @@ import click
 from conversation_agent.config import ExportConfig, STTConfig, TTSConfig
 from conversation_agent.core import InterviewOrchestrator, export_interview
 from conversation_agent.core.audio import AudioManager
-from conversation_agent.core.pdf_parser import PDFQuestionParser
 from conversation_agent.utils.logging_config import get_logger, setup_logging
 
 logger = get_logger(__name__)
@@ -93,16 +92,6 @@ def start(
         logger.info("Starting Voice Interview Agent...")
         logger.info(f"Loading questionnaire: {pdf_path}")
 
-        # Parse PDF questions
-        parser = PDFQuestionParser(pdf_path)
-        questions = parser.parse()
-
-        if not questions:
-            logger.error("No questions found in PDF. Please check the file format.")
-            sys.exit(1)
-
-        logger.info(f"Loaded {len(questions)} questions from PDF")
-
         # Configure TTS
         tts_config = TTSConfig()
         if tts_rate:
@@ -127,14 +116,16 @@ def start(
         if no_metadata:
             export_config.include_metadata = False
 
-        # Create orchestrator
+        # Create orchestrator (it will load the PDF internally)
+        click.echo("Loading questionnaire...")
         orchestrator = InterviewOrchestrator(
-            questions=questions,
             tts_provider=tts_provider,
             stt_provider=stt_provider,
-            questionnaire_path=pdf_path,
+            pdf_path=str(pdf_path),
             enable_confirmation=not no_confirmation,
         )
+
+        logger.info(f"Loaded {len(orchestrator.questions)} questions from PDF")
 
         # Display instructions
         click.echo("\n" + "=" * 70)
