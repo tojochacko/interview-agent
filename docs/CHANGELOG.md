@@ -7,18 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned - Phase 3 (STT Integration)
-- STT provider abstraction
-- OpenAI Whisper integration
-- Audio manager with PyAudio
-- STT unit tests
-
-### Planned - Phase 4 (Orchestration)
-- Interview orchestrator
-- Conversation state machine
-- Intent recognition
-- Natural conversation support
-
 ### Planned - Phase 5 (CSV Export)
 - CSV exporter implementation
 - Session data serialization
@@ -34,6 +22,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced error messages
 - Progress indicators
 - Pause/resume functionality
+
+## [0.4.0] - 2025-11-17
+
+### Added - Phase 4 (Conversation Orchestration)
+
+#### Conversation State Machine
+- `ConversationStateMachine` class for managing interview states
+- 7 states: INIT, GREETING, QUESTIONING, CONFIRMING, CLOSING, COMPLETE, ERROR
+- Validated state transitions with fail-fast error handling
+- Error state with recovery mechanism
+- Terminal state detection
+- `ConversationState` enum for type-safe state values
+- `UserIntent` enum for user action classification
+
+#### Intent Recognition
+- `IntentRecognizer` class for natural language understanding
+- Pattern-based intent matching (regex)
+- 9 user intents: ANSWER, REPEAT, CLARIFY, SKIP, CONFIRM_YES, CONFIRM_NO, START, QUIT, UNKNOWN
+- Case-insensitive matching with 20+ patterns per intent
+- Context-aware recognition (confidence boost for expected intents)
+- Configurable confidence threshold (default: 0.7)
+- State-aware expected intents
+
+#### Interview Orchestrator
+- `InterviewOrchestrator` class coordinating conversation flow
+- Full interview lifecycle management (greeting → questions → closing)
+- TTS/STT provider integration
+- Natural conversation features:
+  - Repeat question on user request
+  - Clarification requests
+  - Skip questions
+  - Answer confirmation
+  - Early exit support
+- Retry logic (configurable max attempts)
+- Progress tracking (percent complete, questions remaining)
+- Keyboard interrupt handling (Ctrl+C)
+- Error recovery mechanisms
+- Customizable greeting/closing messages
+
+#### Testing
+- 73 new comprehensive unit tests
+- 163 total tests passing
+- 77% overall code coverage
+- Test files:
+  - `test_conversation_state.py` (26 tests, 100% coverage)
+  - `test_intent_recognizer.py` (29 tests, 100% coverage)
+  - `test_interview_orchestrator.py` (18 tests, 53% coverage)
+
+#### Examples & Documentation
+- Interactive orchestration demo (`examples/demo_orchestration.py`)
+- 5 demo sections (state machine, intent recognition, full simulation)
+- Phase 4 implementation guide (750 lines)
+- Updated architecture documentation
+
+### Changed
+- Updated project version to 0.4.0
+- Extended `core/__init__.py` with new exports
+- Enhanced integration between Phases 1-3
+
+### Code Quality
+- All files under 500 lines (CLAUDE.md compliant)
+- All functions under 50 lines
+- Orchestrator class 156 lines (acceptable for coordinator class)
+- Line length max 100 characters
+- 100% Ruff compliance
+- Type hints throughout
+- Comprehensive docstrings
 
 ## [0.2.0] - 2025-11-17
 

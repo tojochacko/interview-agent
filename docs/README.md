@@ -7,9 +7,9 @@ This directory contains comprehensive documentation for the Voice Interview Agen
 ### Phase Documentation (`phases/`)
 Detailed implementation records for each development phase:
 - **phase-01-foundation.md** - PDF parsing and data models (COMPLETED)
-- **phase-02-tts.md** - Text-to-Speech integration (PLANNED)
-- **phase-03-stt.md** - Speech-to-Text integration (PLANNED)
-- **phase-04-orchestration.md** - Conversation orchestration (PLANNED)
+- **phase-02-tts-integration.md** - Text-to-Speech integration (COMPLETED)
+- **phase-03-stt-implementation.md** - Speech-to-Text integration (COMPLETED)
+- **phase-04-orchestration.md** - Conversation orchestration (COMPLETED)
 - **phase-05-csv-export.md** - CSV export functionality (PLANNED)
 - **phase-06-cli.md** - CLI interface (PLANNED)
 - **phase-07-polish.md** - Production readiness (PLANNED)
@@ -47,9 +47,9 @@ When working on this project, please:
 | Phase | Status | Coverage | Files |
 |-------|--------|----------|-------|
 | Phase 1: Foundation | ✅ COMPLETE | 84% | 6 files, 620 LOC |
-| Phase 2: TTS | 📋 PLANNED | - | - |
-| Phase 3: STT | 📋 PLANNED | - | - |
-| Phase 4: Orchestration | 📋 PLANNED | - | - |
+| Phase 2: TTS | ✅ COMPLETE | 82% | 3 files, 270 LOC |
+| Phase 3: STT | ✅ COMPLETE | 91% | 3 files, 290 LOC |
+| Phase 4: Orchestration | ✅ COMPLETE | 77% overall | 3 files, 450 LOC |
 | Phase 5: CSV Export | 📋 PLANNED | - | - |
 | Phase 6: CLI | 📋 PLANNED | - | - |
 | Phase 7: Polish | 📋 PLANNED | - | - |
