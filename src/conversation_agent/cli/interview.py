@@ -93,7 +93,7 @@ def start(
         logger.info(f"Loading questionnaire: {pdf_path}")
 
         # Configure TTS
-        tts_config = TTSConfig()
+        tts_config = TTSConfig(voice="com.apple.voice.Aman")
         if tts_rate:
             tts_config.rate = tts_rate
         logger.debug(f"TTS config: rate={tts_config.rate}, volume={tts_config.volume}")

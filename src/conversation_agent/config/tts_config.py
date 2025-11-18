@@ -20,7 +20,7 @@ class TTSConfig(BaseSettings):
 
     Environment Variables:
         TTS_PROVIDER: Provider name (default: "pyttsx3")
-        TTS_VOICE: Voice ID to use (default: system default)
+        TTS_VOICE: Voice ID to use (default: None, uses system default)
         TTS_RATE: Speech rate in WPM (default: 175)
         TTS_VOLUME: Volume level 0.0-1.0 (default: 0.9)
 
