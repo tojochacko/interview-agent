@@ -14,9 +14,23 @@ Usage:
 
 from __future__ import annotations
 
+import logging
+import sys
+import time
+
 from conversation_agent.config import TTSConfig
 from conversation_agent.providers.tts import Pyttsx3Provider, TTSError
 
+# Configure logging to show all levels
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 def print_header(title: str) -> None:
     """Print a formatted section header."""
@@ -33,6 +47,18 @@ def demo_provider_initialization():
         provider = Pyttsx3Provider()
         print("✅ Pyttsx3Provider initialized successfully")
         print(f"   Provider: {provider.__class__.__name__}")
+
+        # Set Albert voice
+        albert_voice_id = 'com.apple.voice.Aman'
+        logger.info(f"Setting voice to: {albert_voice_id}")
+        try:
+            provider.set_voice(albert_voice_id)
+            print("✅ Voice set to: Albert")
+            logger.info("✅ Voice successfully set to Albert")
+        except TTSError as e:
+            logger.warning(f"⚠️ Could not set Albert voice: {e}")
+            print(f"⚠️ Could not set Albert voice, using default: {e}")
+
         return provider
     except TTSError as e:
         print(f"❌ Failed to initialize provider: {e}")
@@ -47,7 +73,7 @@ def demo_available_voices(provider: Pyttsx3Provider):
         voices = provider.get_available_voices()
         print(f"Found {len(voices)} available voices:\n")
 
-        for i, voice in enumerate(voices[:5], 1):  # Show first 5 voices
+        for i, voice in enumerate(voices[:10], 1):  # Show first 10 voices
             print(f"  {i}. {voice['name']}")
             print(f"     ID: {voice['id']}")
             print(f"     Language: {voice['language']}\n")
@@ -83,6 +109,10 @@ def demo_voice_customization(provider: Pyttsx3Provider):
     """Demonstrate voice customization (rate, volume)."""
     print_header("4. Voice Customization")
 
+    logger.info("=" * 70)
+    logger.info("STARTING VOICE CUSTOMIZATION DEMO")
+    logger.info("=" * 70)
+
     # Test different rates
     print("Testing speech rates:\n")
     rates = [
@@ -91,16 +121,47 @@ def demo_voice_customization(provider: Pyttsx3Provider):
         (250, "fast"),
     ]
 
-    for rate, description in rates:
+    for i, (rate, description) in enumerate(rates, 1):
+        logger.info(f"\n{'='*70}")
+        logger.info(f"RATE TEST {i}/{len(rates)}: {rate} WPM ({description})")
+        logger.info(f"{'='*70}")
         print(f"  Rate: {rate} WPM ({description})")
+
         try:
+            logger.info(f">>> Calling provider.set_rate({rate})")
             provider.set_rate(rate)
-            provider.speak(f"This is {description} speed speech.")
+            logger.info("<<< set_rate completed successfully")
+
+            speech_text = f"This is {description} speed speech."
+            logger.info(f">>> Calling provider.speak('{speech_text}')")
+
+            # Check engine state before speaking
+            try:
+                logger.debug(f"Engine state check: {provider.engine}")
+                in_loop = (
+                    provider.engine._inLoop
+                    if hasattr(provider.engine, '_inLoop')
+                    else 'unknown'
+                )
+                logger.debug(f"Engine busy: {in_loop}")
+            except Exception as state_err:
+                logger.warning(f"Could not check engine state: {state_err}")
+
+            provider.speak(speech_text)
+            logger.info("<<< speak completed successfully")
             print("  ✅ Completed\n")
+
         except TTSError as e:
+            logger.error(f"❌ TTSError caught: {e}", exc_info=True)
             print(f"  ❌ Failed: {e}\n")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error: {e}", exc_info=True)
+            print(f"  ❌ Unexpected error: {e}\n")
 
     # Test different volumes
+    logger.info(f"\n{'='*70}")
+    logger.info("STARTING VOLUME TESTS")
+    logger.info(f"{'='*70}")
     print("Testing volumes:\n")
     volumes = [
         (0.3, "quiet"),
@@ -108,18 +169,55 @@ def demo_voice_customization(provider: Pyttsx3Provider):
         (1.0, "loud"),
     ]
 
-    for volume, description in volumes:
+    for i, (volume, description) in enumerate(volumes, 1):
+        logger.info(f"\n{'='*70}")
+        logger.info(f"VOLUME TEST {i}/{len(volumes)}: {volume} ({description})")
+        logger.info(f"{'='*70}")
         print(f"  Volume: {volume} ({description})")
+
         try:
+            logger.info(f">>> Calling provider.set_volume({volume})")
             provider.set_volume(volume)
-            provider.speak(f"This is {description} volume.")
+            logger.info("<<< set_volume completed successfully")
+
+            speech_text = f"This is {description} volume."
+            logger.info(f">>> Calling provider.speak('{speech_text}')")
+
+            # Check engine state before speaking
+            try:
+                logger.debug(f"Engine state check: {provider.engine}")
+                in_loop = (
+                    provider.engine._inLoop
+                    if hasattr(provider.engine, '_inLoop')
+                    else 'unknown'
+                )
+                logger.debug(f"Engine busy: {in_loop}")
+            except Exception as state_err:
+                logger.warning(f"Could not check engine state: {state_err}")
+
+            provider.speak(speech_text)
+            logger.info("<<< speak completed successfully")
             print("  ✅ Completed\n")
+
         except TTSError as e:
+            logger.error(f"❌ TTSError caught: {e}", exc_info=True)
             print(f"  ❌ Failed: {e}\n")
+        except Exception as e:
+            logger.error(f"❌ Unexpected error: {e}", exc_info=True)
+            print(f"  ❌ Unexpected error: {e}\n")
 
     # Reset to defaults
-    provider.set_rate(175)
-    provider.set_volume(0.9)
+    logger.info(f"\n{'='*70}")
+    logger.info("RESETTING TO DEFAULTS")
+    logger.info(f"{'='*70}")
+    try:
+        logger.info(">>> Resetting rate to 175 WPM")
+        provider.set_rate(175)
+        logger.info(">>> Resetting volume to 0.9")
+        provider.set_volume(0.9)
+        logger.info("✅ Reset completed successfully")
+    except Exception as e:
+        logger.error(f"❌ Failed to reset defaults: {e}", exc_info=True)
 
 
 def demo_voice_selection(provider: Pyttsx3Provider, voices: list[dict[str, str]]):
