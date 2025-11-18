@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Optional
 
+from conversation_agent.core.audio import AudioManager
 from conversation_agent.core.conversation_state import (
     ConversationState,
     ConversationStateMachine,
@@ -21,6 +23,8 @@ from conversation_agent.models.interview import (
 )
 from conversation_agent.providers.stt.base import STTProvider
 from conversation_agent.providers.tts.base import TTSProvider
+
+logger = logging.getLogger(__name__)
 
 
 class InterviewOrchestrator:
@@ -85,6 +89,7 @@ class InterviewOrchestrator:
 
         self.tts = tts_provider
         self.stt = stt_provider
+        self.audio_manager = AudioManager()
         self.state_machine = ConversationStateMachine()
         self.intent_recognizer = IntentRecognizer()
 
@@ -109,6 +114,8 @@ class InterviewOrchestrator:
         self.current_question: Optional[Question] = None  # noqa: UP045
         self.current_response_text: Optional[str] = None  # noqa: UP045
         self.retry_count = 0
+        self.last_audio_size = 0  # Track last audio size for duplicate detection
+        self.duplicate_audio_count = 0  # Count consecutive duplicate audio captures
 
     def run(self) -> InterviewSession:
         """Run the complete interview.
@@ -128,6 +135,9 @@ class InterviewOrchestrator:
             self.state_machine.transition_to(ConversationState.QUESTIONING)
             while self.current_question_index < len(self.questions):
                 self._process_question()
+                # Check if user quit early
+                if self.state_machine.is_terminal():
+                    return self.session
 
             # Close interview
             self.state_machine.transition_to(ConversationState.CLOSING)
@@ -156,11 +166,37 @@ class InterviewOrchestrator:
 
         # Wait for user to confirm ready
         while True:
-            result = self.stt.transcribe_audio_data(b"", 16000)  # Placeholder
+            # Record audio from microphone with shorter silence detection
+            audio_data = self.audio_manager.record_until_silence(
+                silence_threshold=0.005,  # Slightly less sensitive to noise
+                silence_duration=2.0,     # 1 second of silence (faster response)
+            )
+            # Log audio data details
+            audio_duration = len(audio_data) / (
+                self.audio_manager.get_sample_rate()
+                * self.audio_manager.channels
+                * 2
+            )
+            logger.info(
+                f"🎤 Recorded audio: {len(audio_data)} bytes, "
+                f"{audio_duration:.2f}s duration"
+            )
+
+            result = self.stt.transcribe_audio_data(
+                audio_data,
+                self.audio_manager.get_sample_rate()
+            )
+            # Log transcription result
+            logger.info(f"📝 Transcription result: {result}")
             user_text = result.get("text", "")
 
             intent, confidence = self.intent_recognizer.recognize(
                 user_text, context_intent=UserIntent.START
+            )
+            logger.info(
+                f"🎯 Intent recognized: {intent.value}, "
+                f"confidence: {confidence:.2f}, "
+                f"text: '{user_text}'"
             )
 
             if intent == UserIntent.START:
@@ -180,54 +216,129 @@ class InterviewOrchestrator:
         self.retry_count = 0
         turn_start = time.time()
 
+        logger.info(
+            f"📋 Processing question {self.current_question_index + 1}/"
+            f"{len(self.questions)}: '{self.current_question.text[:50]}...'"
+        )
+
         # Ask question
         self._ask_question()
 
+        # Wait for TTS audio to fully finish and dissipate
+        # Prevents microphone from picking up speaker output
+        logger.info("⏳ Waiting for audio to settle before listening...")
+        time.sleep(1.0)  # 2 second delay to prevent echo/feedback
+        logger.info("🎧 Ready to listen for response")
+
         # Get answer
+        loop_iteration = 0
         while self.retry_count < self.max_retries:
+            loop_iteration += 1
+            logger.info(
+                f"🔄 Loop iteration {loop_iteration}, "
+                f"retry_count={self.retry_count}/{self.max_retries}"
+            )
+
             user_text = self._listen_for_response()
 
             if not user_text:
                 self.retry_count += 1
+                logger.warning(
+                    f"⚠️ Empty transcription, retry_count={self.retry_count}/"
+                    f"{self.max_retries}"
+                )
                 if self.retry_count < self.max_retries:
                     self.tts.speak("I didn't hear that. Could you please repeat?")
+                    time.sleep(1.5)  # Wait for audio to settle
                 continue
 
             # Recognize intent
-            intent, _ = self.intent_recognizer.recognize(user_text)
+            intent, confidence = self.intent_recognizer.recognize(user_text)
+            logger.info(
+                f"🎯 Intent: {intent.value}, confidence: {confidence:.2f}, "
+                f"text: '{user_text}'"
+            )
 
             # Handle intent
             if intent == UserIntent.ANSWER:
+                logger.info("✅ Recognized as ANSWER intent")
                 self.current_response_text = user_text
                 if self.enable_confirmation:
-                    if self._confirm_answer():
+                    logger.info("🔍 Confirmation enabled, requesting confirmation...")
+                    confirmed = self._confirm_answer()
+                    logger.info(
+                        f"🔍 Confirmation result: {confirmed}, "
+                        f"retry_count={self.retry_count}/{self.max_retries}"
+                    )
+                    if confirmed:
+                        logger.info("✅ Answer confirmed, breaking loop")
                         break  # Answer confirmed
+                    # Check if max retries reached after failed confirmation
+                    if self.retry_count >= self.max_retries:
+                        logger.warning(
+                            "⚠️ Max retries reached after failed confirmation, "
+                            "breaking loop"
+                        )
+                        break  # Give up, save whatever we have
+                    logger.info("🔄 Confirmation failed, retrying...")
                     # else: Loop to retry
                 else:
+                    logger.info("✅ No confirmation needed, breaking loop")
                     break  # No confirmation needed
 
             elif intent == UserIntent.REPEAT:
+                logger.info("🔁 REPEAT intent, asking question again")
                 self._ask_question()
+                time.sleep(1.5)  # Wait for audio to settle
 
             elif intent == UserIntent.CLARIFY:
+                logger.info("❓ CLARIFY intent, providing clarification")
                 self._provide_clarification()
+                time.sleep(1.5)  # Wait for audio to settle
 
             elif intent == UserIntent.SKIP:
+                logger.info("⏭️ SKIP intent, skipping question")
                 self._skip_question(turn_start)
                 return
 
             elif intent == UserIntent.QUIT:
+                logger.info("🛑 QUIT intent, exiting interview")
                 self._handle_early_exit()
                 return
 
             else:
                 # Treat as answer attempt
+                logger.info(
+                    f"❔ UNKNOWN/OTHER intent ({intent.value}), "
+                    "treating as answer attempt"
+                )
                 self.current_response_text = user_text
                 if self.enable_confirmation:
-                    if self._confirm_answer():
+                    logger.info("🔍 Confirmation enabled, requesting confirmation...")
+                    confirmed = self._confirm_answer()
+                    logger.info(
+                        f"🔍 Confirmation result: {confirmed}, "
+                        f"retry_count={self.retry_count}/{self.max_retries}"
+                    )
+                    if confirmed:
+                        logger.info("✅ Answer confirmed, breaking loop")
                         break
+                    # Check if max retries reached after failed confirmation
+                    if self.retry_count >= self.max_retries:
+                        logger.warning(
+                            "⚠️ Max retries reached after failed confirmation, "
+                            "breaking loop"
+                        )
+                        break  # Give up, save whatever we have
+                    logger.info("🔄 Confirmation failed, retrying...")
                 else:
+                    logger.info("✅ No confirmation needed, breaking loop")
                     break
+
+        logger.info(
+            f"🏁 Exited loop after {loop_iteration} iterations, "
+            f"final retry_count={self.retry_count}"
+        )
 
         # Save turn
         self._save_turn(turn_start)
@@ -238,7 +349,10 @@ class InterviewOrchestrator:
         if self.current_question:
             question_text = f"Question {self.current_question.number}. "
             question_text += self.current_question.text
+            logger.info(f"🔊 Speaking question: '{question_text}'")
+            logger.info(f"📢 TTS provider: {self.tts.__class__.__name__}")
             self.tts.speak(question_text)
+            logger.info("✅ TTS completed speaking question")
 
     def _listen_for_response(self) -> str:
         """Listen for user response via STT.
@@ -246,10 +360,96 @@ class InterviewOrchestrator:
         Returns:
             Transcribed text
         """
-        # Placeholder: In real implementation, use AudioManager
-        # to record from microphone
-        result = self.stt.transcribe_audio_data(b"", 16000)
-        return result.get("text", "")
+        logger.info("👂 Entering _listen_for_response, starting audio recording...")
+        # Record audio from microphone with high silence threshold
+        # This reduces false positives from echo/feedback and ambient noise
+        audio_data = self.audio_manager.record_until_silence(
+            silence_threshold=0.05,   # Very high threshold = much less sensitive
+            silence_duration=3.0,     # 3 seconds of silence to ensure speech ended
+        )
+        # Log audio data details
+        audio_duration = len(audio_data) / (
+            self.audio_manager.get_sample_rate()
+            * self.audio_manager.channels
+            * 2
+        )
+        logger.info(
+            f"🎤 Recorded audio: {len(audio_data)} bytes, "
+            f"{audio_duration:.2f}s duration"
+        )
+
+        # Check for duplicate audio (possible echo/feedback issue)
+        if len(audio_data) == self.last_audio_size and self.last_audio_size > 0:
+            self.duplicate_audio_count += 1
+            logger.warning(
+                f"⚠️ DUPLICATE AUDIO DETECTED! Same audio size as previous: "
+                f"{len(audio_data)} bytes (count: {self.duplicate_audio_count}). "
+                "This may indicate microphone is picking up TTS echo/feedback "
+                "or ambient noise."
+            )
+        else:
+            self.duplicate_audio_count = 0  # Reset counter
+        self.last_audio_size = len(audio_data)
+
+        # Check audio quality - reject if too short (likely just noise)
+        MIN_VALID_AUDIO_DURATION = 0.5  # At least 0.5 seconds of audio
+        if audio_duration < MIN_VALID_AUDIO_DURATION:
+            logger.warning(
+                f"⚠️ Audio too short ({audio_duration:.2f}s < "
+                f"{MIN_VALID_AUDIO_DURATION}s), likely noise. Treating as silence."
+            )
+            return ""
+
+        # Check audio energy level - reject if too quiet (just ambient noise)
+        import struct
+        audio_samples = struct.unpack(f"{len(audio_data) // 2}h", audio_data)
+        avg_amplitude = sum(abs(sample) for sample in audio_samples) / len(
+            audio_samples
+        )
+        MIN_AMPLITUDE = 100  # Minimum average amplitude for valid speech
+        if avg_amplitude < MIN_AMPLITUDE:
+            logger.warning(
+                f"⚠️ Audio amplitude too low ({avg_amplitude:.0f} < "
+                f"{MIN_AMPLITUDE}), likely ambient noise. Treating as silence."
+            )
+            return ""
+
+        logger.info(
+            f"✅ Audio quality check passed: duration={audio_duration:.2f}s, "
+            f"amplitude={avg_amplitude:.0f}"
+        )
+
+        # Transcribe the recorded audio
+        logger.info("🔊 Transcribing recorded audio...")
+        result = self.stt.transcribe_audio_data(
+            audio_data,
+            self.audio_manager.get_sample_rate()
+        )
+        # Log transcription result
+        logger.info(f"📝 Transcription result: {result}")
+
+        user_text = result.get("text", "").strip()
+
+        # Check for Whisper hallucinations (common false positives)
+        WHISPER_HALLUCINATIONS = [
+            "you", "thank you", "thanks", ".", "...",
+            "bye", "goodbye", "music", "subscribe"
+        ]
+        if user_text.lower() in WHISPER_HALLUCINATIONS and audio_duration < 2.0:
+            logger.warning(
+                f"⚠️ Potential Whisper hallucination detected: '{user_text}' "
+                f"with short audio ({audio_duration:.2f}s). Treating as silence."
+            )
+            return ""
+
+        if user_text:
+            logger.info(
+                f"✅ User response: '{user_text}' (length: {len(user_text)})"
+            )
+        else:
+            logger.warning("⚠️ Empty transcription received")
+
+        return user_text
 
     def _confirm_answer(self) -> bool:
         """Confirm user's answer.
@@ -257,29 +457,57 @@ class InterviewOrchestrator:
         Returns:
             True if user confirms, False if wants to retry
         """
+        logger.info(
+            f"🔍 Entering _confirm_answer, current_response_text="
+            f"'{self.current_response_text}', retry_count={self.retry_count}"
+        )
         self.state_machine.transition_to(ConversationState.CONFIRMING)
 
         # Repeat answer back
-        self.tts.speak(f"You said: {self.current_response_text}. Is that correct?")
+        confirmation_prompt = (
+            f"You said: {self.current_response_text}. Is that correct?"
+        )
+        logger.info(f"💬 Asking for confirmation: '{confirmation_prompt}'")
+        self.tts.speak(confirmation_prompt)
+
+        # Wait for TTS audio to settle
+        logger.info("⏳ Waiting for audio to settle before listening...")
+        time.sleep(1.5)  # 1.5 second delay to prevent echo/feedback
+        logger.info("🎧 Ready to listen for confirmation")
 
         # Get confirmation
         user_text = self._listen_for_response()
-        intent, _ = self.intent_recognizer.recognize(
+        logger.info(f"📥 Received confirmation response: '{user_text}'")
+
+        intent, confidence = self.intent_recognizer.recognize(
             user_text, context_intent=UserIntent.CONFIRM_YES
+        )
+        logger.info(
+            f"🎯 Confirmation intent: {intent.value}, confidence: {confidence:.2f}"
         )
 
         self.state_machine.transition_to(ConversationState.QUESTIONING)
 
         if intent == UserIntent.CONFIRM_YES:
+            logger.info("✅ Confirmation: YES, returning True")
             return True
         elif intent == UserIntent.CONFIRM_NO:
+            logger.info(
+                f"❌ Confirmation: NO, incrementing retry_count to "
+                f"{self.retry_count + 1}"
+            )
             self.tts.speak("Okay, let's try again.")
             self.retry_count += 1
+            logger.info(f"🔄 retry_count after increment: {self.retry_count}")
             return False
         else:
-            # Unclear, ask again
+            logger.warning(
+                f"❔ Confirmation: UNCLEAR ({intent.value}), incrementing "
+                f"retry_count to {self.retry_count + 1}"
+            )
             self.tts.speak("I didn't understand. Let's try again.")
             self.retry_count += 1
+            logger.info(f"🔄 retry_count after increment: {self.retry_count}")
             return False
 
     def _provide_clarification(self) -> None:

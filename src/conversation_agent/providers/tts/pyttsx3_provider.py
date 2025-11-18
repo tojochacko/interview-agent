@@ -6,9 +6,13 @@ across Windows (SAPI5), macOS (NSSpeechSynthesizer), and Linux (eSpeak).
 
 from __future__ import annotations
 
+import logging
+
 import pyttsx3
 
 from conversation_agent.providers.tts.base import TTSError, TTSProvider
+
+logger = logging.getLogger(__name__)
 
 
 class Pyttsx3Provider(TTSProvider):
@@ -29,19 +33,47 @@ class Pyttsx3Provider(TTSProvider):
         engine: The pyttsx3 engine instance.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, enable_macos_workaround: bool = True) -> None:
         """Initialize the pyttsx3 TTS provider.
+
+        Args:
+            enable_macos_workaround: Enable startLoop/iterate/endLoop pattern
+                on macOS instead of runAndWait(). This works around a known issue
+                where NSSpeechSynthesizer fails on subsequent calls. Default: True.
 
         Raises:
             TTSError: If pyttsx3 engine initialization fails.
         """
+        logger.info("🔧 Initializing Pyttsx3Provider...")
+
+        # Store workaround preference
+        self._enable_macos_workaround = enable_macos_workaround
+
         try:
             self.engine = pyttsx3.init()
+            logger.info("✅ pyttsx3 engine initialized successfully")
+
+            # Log current engine properties
+            try:
+                rate = self.engine.getProperty("rate")
+                volume = self.engine.getProperty("volume")
+                voice = self.engine.getProperty("voice")
+                logger.info(f"   Default rate: {rate} WPM")
+                logger.info(f"   Default volume: {volume}")
+                logger.info(f"   Default voice: {voice}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not retrieve engine properties: {e}")
+
         except Exception as e:
+            logger.error(f"❌ Failed to initialize pyttsx3 engine: {e}")
             raise TTSError(f"Failed to initialize pyttsx3 engine: {e}") from e
 
     def speak(self, text: str) -> None:
         """Speak the given text aloud.
+
+        Note: On macOS, uses startLoop/iterate/endLoop pattern instead of
+        runAndWait() to work around a known issue where NSSpeechSynthesizer
+        fails on subsequent calls.
 
         Args:
             text: The text to speak.
@@ -49,13 +81,60 @@ class Pyttsx3Provider(TTSProvider):
         Raises:
             TTSError: If speech synthesis fails.
         """
+        logger.info(f"🎙️ Pyttsx3Provider.speak() called with text: '{text}'")
+        logger.info(f"   Text length: {len(text)} characters")
+
         if not text or not text.strip():
+            logger.warning("⚠️ Empty text provided, skipping speech")
             return  # Don't speak empty text
 
         try:
+            import platform
+            import time
+
+            logger.info("📝 Calling engine.say()...")
             self.engine.say(text)
-            self.engine.runAndWait()
+
+            # macOS workaround: Use startLoop/iterate/endLoop instead of runAndWait
+            if self._enable_macos_workaround and platform.system() == 'Darwin':
+                logger.info("🍎 macOS detected - using startLoop/iterate/endLoop pattern")
+                logger.info("⏳ Starting event loop...")
+
+                # Start the event loop without blocking
+                self.engine.startLoop(False)
+
+                # Iterate until speech is done
+                # The engine will set _inLoop to False when done
+                max_iterations = 1000  # Safety limit
+                iteration_count = 0
+
+                while iteration_count < max_iterations:
+                    self.engine.iterate()
+                    iteration_count += 1
+
+                    # Check if still busy
+                    if hasattr(self.engine, '_inLoop') and not self.engine._inLoop:
+                        logger.info(f"✅ Speech completed after {iteration_count} iterations")
+                        break
+
+                    # Small delay to prevent CPU spinning
+                    time.sleep(0.01)
+
+                # End the loop
+                self.engine.endLoop()
+                logger.info("✅ Event loop ended")
+
+                if iteration_count >= max_iterations:
+                    logger.warning("⚠️ Reached max iterations, speech may be incomplete")
+
+            else:
+                # Standard runAndWait for non-macOS or when workaround is disabled
+                logger.info("⏳ Calling engine.runAndWait() - blocking until speech completes...")
+                self.engine.runAndWait()
+                logger.info("✅ engine.runAndWait() completed - speech finished")
+
         except Exception as e:
+            logger.error(f"❌ Failed to speak text: {e}", exc_info=True)
             raise TTSError(f"Failed to speak text: {e}") from e
 
     def set_voice(self, voice_id: str) -> None:
@@ -92,12 +171,17 @@ class Pyttsx3Provider(TTSProvider):
         Raises:
             TTSError: If rate setting fails.
         """
+        logger.info(f"🎚️ Setting TTS rate to {rate} WPM")
+
         if rate < 50 or rate > 400:
+            logger.error(f"❌ Rate {rate} out of range (50-400 WPM)")
             raise TTSError(f"Rate {rate} out of range. Use 50-400 WPM.")
 
         try:
             self.engine.setProperty("rate", rate)
+            logger.info(f"✅ Rate set to {rate} WPM")
         except Exception as e:
+            logger.error(f"❌ Failed to set rate: {e}")
             raise TTSError(f"Failed to set rate: {e}") from e
 
     def set_volume(self, volume: float) -> None:
@@ -109,12 +193,17 @@ class Pyttsx3Provider(TTSProvider):
         Raises:
             TTSError: If volume is out of range.
         """
+        logger.info(f"🔊 Setting TTS volume to {volume}")
+
         if volume < 0.0 or volume > 1.0:
+            logger.error(f"❌ Volume {volume} out of range (0.0-1.0)")
             raise TTSError(f"Volume {volume} out of range. Use 0.0-1.0.")
 
         try:
             self.engine.setProperty("volume", volume)
+            logger.info(f"✅ Volume set to {volume}")
         except Exception as e:
+            logger.error(f"❌ Failed to set volume: {e}")
             raise TTSError(f"Failed to set volume: {e}") from e
 
     def get_available_voices(self) -> list[dict[str, str]]:
