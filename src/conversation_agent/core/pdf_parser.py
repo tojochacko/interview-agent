@@ -1,5 +1,6 @@
 """PDF questionnaire parser for extracting interview questions."""
 
+import logging
 from pathlib import Path
 from typing import Optional, Union
 
@@ -19,7 +20,8 @@ class PDFQuestionParser:
     """Parser for extracting questions from PDF questionnaires.
 
     Expects PDF format: one question per line.
-    Empty lines and lines with only whitespace are skipped.
+    Only sentences ending with '?' are considered as questions.
+    Empty lines and lines not ending with '?' are skipped.
     """
 
     def __init__(
@@ -71,6 +73,8 @@ class PDFQuestionParser:
             raise PDFParseError("PDF file has no pages")
 
         questions = self._extract_questions(reader)
+        logger = logging.getLogger(__name__)
+        logger.info(f"Questions to ask: {questions}")
 
         if not questions:
             raise PDFParseError("No valid questions found in PDF")
@@ -134,6 +138,10 @@ class PDFQuestionParser:
             line = line.strip()
 
         if self.skip_empty_lines and not line:
+            return None
+
+        # Only accept lines ending with '?'
+        if not line.endswith('?'):
             return None
 
         return line
