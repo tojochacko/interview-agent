@@ -227,7 +227,7 @@ class InterviewOrchestrator:
         # Wait for TTS audio to fully finish and dissipate
         # Prevents microphone from picking up speaker output
         logger.info("⏳ Waiting for audio to settle before listening...")
-        time.sleep(1.0)  # 2 second delay to prevent echo/feedback
+        time.sleep(1.0)  # 1 second delay to prevent echo/feedback
         logger.info("🎧 Ready to listen for response")
 
         # Get answer

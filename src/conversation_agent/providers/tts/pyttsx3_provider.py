@@ -98,34 +98,45 @@ class Pyttsx3Provider(TTSProvider):
             # macOS workaround: Use startLoop/iterate/endLoop instead of runAndWait
             if self._enable_macos_workaround and platform.system() == 'Darwin':
                 logger.info("🍎 macOS detected - using startLoop/iterate/endLoop pattern")
-                logger.info("⏳ Starting event loop...")
 
                 # Start the event loop without blocking
                 self.engine.startLoop(False)
 
-                # Iterate until speech is done
-                # The engine will set _inLoop to False when done
-                max_iterations = 1000  # Safety limit
+                # Estimate speech duration based on text length and rate
+                # Average word length: 5 characters + 1 space = 6 chars
+                # Rate is in words per minute
+                rate = self.engine.getProperty("rate") or 175
+                estimated_words = len(text) / 6.0
+                estimated_seconds = (estimated_words / rate) * 60.0
+                # Add 0.5s buffer for engine overhead
+                timeout = estimated_seconds + 0.5
+
+                logger.debug(
+                    f"Estimated speech duration: {estimated_seconds:.2f}s "
+                    f"(timeout: {timeout:.2f}s)"
+                )
+
+                # Iterate for the estimated duration
+                start_time = time.time()
                 iteration_count = 0
 
-                while iteration_count < max_iterations:
+                while time.time() - start_time < timeout:
                     self.engine.iterate()
                     iteration_count += 1
 
-                    # Check if still busy
-                    if hasattr(self.engine, '_inLoop') and not self.engine._inLoop:
-                        logger.info(f"✅ Speech completed after {iteration_count} iterations")
-                        break
+                    # Minimal delay every 10 iterations to prevent CPU spinning
+                    if iteration_count % 10 == 0:
+                        time.sleep(0.001)  # 1ms
 
-                    # Small delay to prevent CPU spinning
-                    time.sleep(0.01)
+                elapsed = time.time() - start_time
+                logger.info(
+                    f"✅ Speech completed after {iteration_count} iterations "
+                    f"({elapsed:.2f}s)"
+                )
 
                 # End the loop
                 self.engine.endLoop()
                 logger.info("✅ Event loop ended")
-
-                if iteration_count >= max_iterations:
-                    logger.warning("⚠️ Reached max iterations, speech may be incomplete")
 
             else:
                 # Standard runAndWait for non-macOS or when workaround is disabled

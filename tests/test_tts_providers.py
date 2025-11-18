@@ -68,7 +68,7 @@ class TestPyttsx3Provider:
     def provider(self, mock_engine):
         """Create a Pyttsx3Provider with mocked engine."""
         with patch("pyttsx3.init", return_value=mock_engine):
-            return Pyttsx3Provider()
+            return Pyttsx3Provider(enable_macos_workaround=False)
 
     def test_initialization_success(self, mock_engine):
         """Provider initializes successfully."""
@@ -234,7 +234,8 @@ class TestTTSConfig:
             mock_engine = MagicMock()
             mock_init.return_value = mock_engine
 
-            config = TTSConfig(rate=150, volume=0.8)
+            # Set voice to None to avoid voice validation in test
+            config = TTSConfig(rate=150, volume=0.8, voice=None)
             provider = config.get_provider()
 
             assert isinstance(provider, Pyttsx3Provider)

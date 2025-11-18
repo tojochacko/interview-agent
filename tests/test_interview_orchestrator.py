@@ -26,6 +26,17 @@ class TestInterviewOrchestrator:
         stt.transcribe_audio_data = Mock(return_value={"text": "", "language": "en"})
         return stt
 
+    @pytest.fixture(autouse=True)
+    def mock_audio_manager(self):
+        """Create mock AudioManager (auto-used for all tests)."""
+        with patch("conversation_agent.core.interview.AudioManager") as mock:
+            audio_manager = Mock()
+            audio_manager.record_until_silence.return_value = b"fake_audio_data"
+            audio_manager.get_sample_rate.return_value = 16000
+            audio_manager.channels = 1  # Add channels attribute for logging
+            mock.return_value = audio_manager
+            yield mock
+
     @pytest.fixture
     def sample_pdf_path(self, tmp_path):
         """Create a sample PDF for testing."""
@@ -168,6 +179,98 @@ class TestInterviewOrchestrator:
         assert mock_tts.speak.called
         call_args = mock_tts.speak.call_args[0][0]
         assert "ready to begin" in call_args.lower()
+
+    def test_handle_greeting_retry_on_unrecognized_intent(
+        self, mock_tts, mock_stt, sample_pdf_path
+    ):
+        """Test greeting retries when intent is not recognized."""
+        orchestrator = InterviewOrchestrator(
+            tts_provider=mock_tts, stt_provider=mock_stt, pdf_path=sample_pdf_path
+        )
+
+        # First call: unrecognized intent, second call: start intent
+        mock_stt.transcribe_audio_data.side_effect = [
+            {"text": "what?", "language": "en"},
+            {"text": "yes let's start", "language": "en"},
+        ]
+
+        orchestrator._handle_greeting()
+
+        # Should have called TTS twice: greeting + retry message
+        assert mock_tts.speak.call_count >= 2
+        # Check that retry message was spoken
+        calls = [call[0][0] for call in mock_tts.speak.call_args_list]
+        assert any("didn't catch that" in call.lower() for call in calls)
+
+    def test_handle_greeting_quit_before_start(
+        self, mock_tts, mock_stt, sample_pdf_path
+    ):
+        """Test user can quit during greeting."""
+        orchestrator = InterviewOrchestrator(
+            tts_provider=mock_tts, stt_provider=mock_stt, pdf_path=sample_pdf_path
+        )
+
+        # Mock STT to return quit intent - use clear quit keyword
+        mock_stt.transcribe_audio_data.return_value = {
+            "text": "quit",
+            "language": "en",
+        }
+
+        # Transition to GREETING state (as run() would do)
+        orchestrator.state_machine.transition_to(ConversationState.GREETING)
+        orchestrator._handle_greeting()
+
+        # Session should be marked completed
+        assert orchestrator.session.completed is True
+        # State should transition to COMPLETE
+        assert orchestrator.state_machine.current_state == ConversationState.COMPLETE
+
+    def test_handle_greeting_empty_transcription(
+        self, mock_tts, mock_stt, sample_pdf_path
+    ):
+        """Test greeting handles empty transcription and retries."""
+        orchestrator = InterviewOrchestrator(
+            tts_provider=mock_tts, stt_provider=mock_stt, pdf_path=sample_pdf_path
+        )
+
+        # First call: empty text (triggers retry), second call: start intent
+        mock_stt.transcribe_audio_data.side_effect = [
+            {"text": "", "language": "en"},
+            {"text": "yes I'm ready", "language": "en"},
+        ]
+
+        orchestrator._handle_greeting()
+
+        # Should retry after empty transcription
+        assert mock_stt.transcribe_audio_data.call_count == 2
+        # Should have prompted user again (initial greeting + retry prompt)
+        assert mock_tts.speak.call_count >= 2
+        # Verify retry message was spoken
+        calls = [call[0][0] for call in mock_tts.speak.call_args_list]
+        assert any("didn't catch that" in call.lower() for call in calls)
+
+    def test_handle_greeting_multiple_retries(
+        self, mock_tts, mock_stt, sample_pdf_path
+    ):
+        """Test greeting can handle multiple retries."""
+        orchestrator = InterviewOrchestrator(
+            tts_provider=mock_tts, stt_provider=mock_stt, pdf_path=sample_pdf_path
+        )
+
+        # Multiple unrecognized intents before starting
+        mock_stt.transcribe_audio_data.side_effect = [
+            {"text": "huh?", "language": "en"},
+            {"text": "what did you say?", "language": "en"},
+            {"text": "sorry what?", "language": "en"},
+            {"text": "ok yes let's begin", "language": "en"},
+        ]
+
+        orchestrator._handle_greeting()
+
+        # Should have retried multiple times
+        assert mock_stt.transcribe_audio_data.call_count == 4
+        # Should have spoken retry message multiple times
+        assert mock_tts.speak.call_count >= 4
 
     def test_ask_question_formats_correctly(
         self, mock_tts, mock_stt, sample_pdf_path

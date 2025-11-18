@@ -99,7 +99,9 @@ def start(
         logger.debug(f"TTS config: rate={tts_config.rate}, volume={tts_config.volume}")
 
         # Configure STT
-        stt_config = STTConfig()
+        stt_config = STTConfig(
+            model_size="small"
+            )
         if stt_model:
             stt_config.model_size = stt_model
         logger.debug(f"STT config: model={stt_config.model_size}, language={stt_config.language}")  # noqa: E501
