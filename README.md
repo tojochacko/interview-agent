@@ -6,6 +6,7 @@ A voice-based conversational agent that conducts interviews using PDF questionna
 
 - 🎤 **Voice-based interviews** using speech-to-text and text-to-speech
 - 🎙️ **High-quality neural voice** (9/10 quality) using Piper TTS
+- 📧 **Smart data normalization** - automatically formats emails, phone numbers from speech
 - 📄 **PDF questionnaire parsing** (one question per line format)
 - 🗣️ **Natural conversation** with support for repeat, clarify, and skip commands
 - 💾 **CSV export** with structured data and metadata
@@ -197,6 +198,12 @@ export STT_MODEL_SIZE=base          # tiny|base|small|medium|large
 export STT_LANGUAGE=en              # Language code
 export STT_DEVICE=cpu               # cpu or cuda (for GPU)
 
+# Text Normalization (Structured Data)
+export NORMALIZATION_ENABLED=true         # Enable/disable normalization
+export NORMALIZATION_ENABLE_EMAILS=true   # Normalize email addresses
+export NORMALIZATION_ENABLE_PHONES=true   # Normalize phone numbers
+export NORMALIZATION_VERBOSE=false        # Log normalization changes
+
 # Export Configuration
 export EXPORT_OUTPUT_DIRECTORY="./transcripts"
 export EXPORT_INCLUDE_METADATA=true
@@ -213,6 +220,29 @@ Choose based on your needs:
 | `small` | Medium | Better | ~2GB | Higher accuracy needs |
 | `medium` | Slower | High | ~5GB | Professional transcription |
 | `large` | Slowest | Highest | ~10GB | Maximum accuracy (GPU recommended) |
+
+### Structured Data Normalization
+
+The agent automatically recognizes and formats structured data like emails and phone numbers when you speak them:
+
+**Email addresses:**
+- Say: "My email is john dot smith at gmail dot com"
+- Saved as: `john.smith@gmail.com`
+
+**Phone numbers:**
+- Say: "Call me at five five five one two three four"
+- Saved as: `555-1234`
+
+**Supported patterns:**
+- Emails with dots, underscores, dashes
+- 7, 10, 11-digit phone numbers
+- International numbers with "plus"
+- Toll-free numbers with "eight hundred"
+
+This happens automatically with zero configuration needed. To disable:
+```bash
+export NORMALIZATION_ENABLED=false
+```
 
 ## Creating Questionnaires
 

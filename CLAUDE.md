@@ -51,8 +51,9 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp --header "
 
 A production-ready **Voice Interview Agent** that conducts voice-based interviews using PDF questionnaires. The agent speaks questions via TTS, listens to responses via STT, and exports transcripts to CSV. All processing is local/offline. This is a CLI tool with modular provider architecture supporting different TTS/STT implementations.
 
-**Current Status**: Phase 7 Complete - Piper TTS Migration (High-Quality Neural Voice)
+**Current Status**: Phase 8 Complete - Structured Data Normalization (Email/Phone Numbers)
 **Voice Quality**: 9/10 with Piper TTS (upgraded from 1/10 with pyttsx3)
+**Data Quality**: Automatic formatting of emails, phone numbers from speech (Phase 8)
 
 ⚠️ **Read `docs/` folder for all context** - See `docs/README.md` for navigation.
 
@@ -67,13 +68,14 @@ conversation-agent-v11/
 │   │   ├── pdf_parser.py       # Parse PDF questionnaires
 │   │   ├── interview.py        # Interview orchestration
 │   │   ├── csv_exporter.py     # CSV export
+│   │   ├── text_normalizer.py  # Structured data normalization (Phase 8)
 │   │   └── intent_recognizer.py, conversation_state.py, audio.py
 │   ├── providers/              # ✅ TTS/STT implementations (Phases 2-3, 7)
 │   │   ├── tts/                # Piper (default), pyttsx3 (fallback)
 │   │   └── stt/                # Whisper provider
 │   ├── config/                 # ✅ Configuration (Phases 2-5)
 │   └── utils/                  # ✅ Logging (Phase 6)
-├── tests/                      # ✅ 205 tests, 79% coverage
+├── tests/                      # ✅ 277 tests, 77% coverage (42 new normalization tests)
 ├── docs/                       # ⚠️ READ THIS FIRST for full context
 │   ├── phases/                 # Per-phase implementation docs
 │   ├── architecture/           # System design & decisions
@@ -83,9 +85,11 @@ conversation-agent-v11/
 └── features/                   # Feature plans
 ```
 
-**Status**: Phase 6/7 Complete ✅ (CLI Interface & Integration)
-**Coverage**: 79% overall, 81% CLI module
-**Documentation**: `docs/README.md` → `docs/phases/phase-06-cli.md` for latest
+**Status**: Phase 8 Complete ✅ (Structured Data Normalization)
+**Coverage**: 77% overall, 94% text_normalizer module
+**Latest Features**:
+- Phase 7: Piper TTS (high-quality neural voice)
+- Phase 8: Email & phone number normalization from speech
 
 **Import convention**: Always use absolute imports
 ```python
