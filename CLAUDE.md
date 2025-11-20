@@ -51,8 +51,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp --header "
 
 A production-ready **Voice Interview Agent** that conducts voice-based interviews using PDF questionnaires. The agent speaks questions via TTS, listens to responses via STT, and exports transcripts to CSV. All processing is local/offline. This is a CLI tool with modular provider architecture supporting different TTS/STT implementations.
 
-**Current Status**: Phase 6/7 Complete - CLI Interface & End-to-End Integration
-**Next**: Phase 7 - Polish & Production Readiness
+**Current Status**: Phase 7 Complete - Piper TTS Migration (High-Quality Neural Voice)
+**Voice Quality**: 9/10 with Piper TTS (upgraded from 1/10 with pyttsx3)
 
 ⚠️ **Read `docs/` folder for all context** - See `docs/README.md` for navigation.
 
@@ -68,8 +68,8 @@ conversation-agent-v11/
 │   │   ├── interview.py        # Interview orchestration
 │   │   ├── csv_exporter.py     # CSV export
 │   │   └── intent_recognizer.py, conversation_state.py, audio.py
-│   ├── providers/              # ✅ TTS/STT implementations (Phases 2-3)
-│   │   ├── tts/                # pyttsx3 provider
+│   ├── providers/              # ✅ TTS/STT implementations (Phases 2-3, 7)
+│   │   ├── tts/                # Piper (default), pyttsx3 (fallback)
 │   │   └── stt/                # Whisper provider
 │   ├── config/                 # ✅ Configuration (Phases 2-5)
 │   └── utils/                  # ✅ Logging (Phase 6)
@@ -99,25 +99,26 @@ from ..models import Question  # ❌
 
 ```bash
 # Setup
-pip install -e ".[dev]"                              # Install with dev dependencies
 source .venv/bin/activate                             # Activate venv (macOS/Linux)
+# IMPORTANT: Always activate venv first! Use .venv/bin/python, not system python
+pip install -e ".[dev]"                               # Install with dev dependencies
 
-# Testing
-python -m pytest tests/ -v                            # Run tests
-python -m pytest tests/ --cov=src --cov-report=term   # With coverage (need >80%)
-python -m pytest tests/test_pdf_parser.py::TestClass::test_name -v  # Specific test
+# Testing (ALWAYS use .venv/bin/python, not system python)
+.venv/bin/python -m pytest tests/ -v                            # Run tests
+.venv/bin/python -m pytest tests/ --cov=src --cov-report=term   # With coverage (need >80%)
+.venv/bin/python -m pytest tests/test_pdf_parser.py::TestClass::test_name -v  # Specific test
 
 # Code Quality
-python -m ruff check src/ tests/                      # Check style
-python -m ruff check --fix src/ tests/                # Auto-fix issues
+.venv/bin/python -m ruff check src/ tests/                      # Check style
+.venv/bin/python -m ruff check --fix src/ tests/                # Auto-fix issues
 
 # CLI Commands (Phase 6 ✅)
-python -m conversation_agent.cli start questionnaire.pdf  # Start interview
-python -m conversation_agent.cli config                    # View settings
-python -m conversation_agent.cli test-audio                # Test audio devices
+.venv/bin/python -m conversation_agent.cli start questionnaire.pdf  # Start interview
+.venv/bin/python -m conversation_agent.cli config                    # View settings
+.venv/bin/python -m conversation_agent.cli test-audio                # Test audio devices
 
 # Workflow
-# 1. Make changes → 2. Test → 3. Ruff check → 4. Commit (if tests pass & coverage >79%)
+# 1. Activate venv → 2. Make changes → 3. Test → 4. Ruff check → 5. Commit (if tests pass & coverage >79%)
 ```
 
 ### Troubleshooting
@@ -210,8 +211,8 @@ response: Optional[Response] = None  # ✅ Use Optional[X], not X | None
 
 ### Implemented Architecture (Phases 1-6)
 
-- ✅ **Config**: Pydantic Settings with env vars (TTS_RATE, STT_MODEL_SIZE, etc.)
-- ✅ **Providers**: Abstract base + concrete (pyttsx3 TTS, Whisper STT)
+- ✅ **Config**: Pydantic Settings with env vars (TTS_PROVIDER, TTS_PIPER_MODEL_PATH, STT_MODEL_SIZE, etc.)
+- ✅ **Providers**: Abstract base + concrete (Piper TTS [default], pyttsx3 TTS [fallback], Whisper STT)
 - ✅ **Security**: Local-only processing, no network requests
 - ✅ **CLI**: Full user interface with start, config, test-audio commands
 - ✅ **Export**: CSV with metadata, configurable output
@@ -240,4 +241,4 @@ response: Optional[Response] = None  # ✅ Use Optional[X], not X | None
 - Phase 4: [Orchestration](docs/phases/phase-04-orchestration.md) ✅
 - Phase 5: [CSV Export](docs/phases/phase-05-csv-export.md) ✅
 - Phase 6: [CLI Interface](docs/phases/phase-06-cli.md) ✅
-- Phase 7: Polish (planned)
+- Phase 7: [Piper TTS Migration](docs/phases/phase-07-piper-migration.md) ✅

@@ -19,10 +19,13 @@ class TTSConfig(BaseSettings):
     or by passing values directly.
 
     Environment Variables:
-        TTS_PROVIDER: Provider name (default: "pyttsx3")
+        TTS_PROVIDER: Provider name (default: "piper")
         TTS_VOICE: Voice ID to use (default: None, uses system default)
-        TTS_RATE: Speech rate in WPM (default: 175)
+        TTS_RATE: Speech rate in WPM (default: 175, pyttsx3 only)
         TTS_VOLUME: Volume level 0.0-1.0 (default: 0.9)
+        TTS_PIPER_MODEL_PATH: Path to Piper .onnx model
+        TTS_PIPER_CONFIG_PATH: Path to Piper config (optional)
+        TTS_PIPER_SAMPLE_RATE: Sample rate in Hz (default: 22050)
 
     Example:
         # Use defaults
@@ -44,8 +47,8 @@ class TTSConfig(BaseSettings):
     )
 
     provider: str = Field(
-        default="pyttsx3",
-        description="TTS provider to use (pyttsx3, gtts, openai, etc.)",
+        default="piper",
+        description="TTS provider to use (pyttsx3, piper)",
     )
 
     voice: Optional[str] = Field(  # noqa: UP045
@@ -67,6 +70,22 @@ class TTSConfig(BaseSettings):
         description="Volume level (0.0-1.0)",
     )
 
+    # Piper-specific configuration (Phase 7)
+    piper_model_path: Optional[str] = Field(  # noqa: UP045
+        default="models/tts/piper/en_US-lessac-medium.onnx",
+        description="Path to Piper ONNX model file",
+    )
+
+    piper_config_path: Optional[str] = Field(  # noqa: UP045
+        default=None,
+        description="Path to Piper config JSON (auto-detected if None)",
+    )
+
+    piper_sample_rate: int = Field(
+        default=22050,
+        description="Piper audio sample rate in Hz",
+    )
+
     def get_provider(self):
         """Get configured TTS provider instance.
 
@@ -74,9 +93,13 @@ class TTSConfig(BaseSettings):
             TTSProvider instance configured with current settings.
 
         Raises:
-            ValueError: If provider name is not recognized.
+            ValueError: If provider name is not recognized or setup fails.
         """
-        from conversation_agent.providers.tts import Pyttsx3Provider, TTSError
+        from conversation_agent.providers.tts import (
+            PiperTTSProvider,
+            Pyttsx3Provider,
+            TTSError,
+        )
 
         if self.provider.lower() == "pyttsx3":
             try:
@@ -90,7 +113,25 @@ class TTSConfig(BaseSettings):
                 return provider
             except TTSError as e:
                 raise ValueError(f"Failed to initialize pyttsx3 provider: {e}") from e
+
+        elif self.provider.lower() == "piper":
+            try:
+                provider = PiperTTSProvider(
+                    model_path=self.piper_model_path,
+                    config_path=self.piper_config_path,
+                    sample_rate=self.piper_sample_rate,
+                )
+                provider.initialize()  # Load model
+                provider.set_volume(self.volume)
+
+                # Note: rate not supported for Piper (fixed prosody)
+                # Note: voice requires model path change, handled separately
+                return provider
+            except TTSError as e:
+                raise ValueError(f"Failed to initialize Piper provider: {e}") from e
+
         else:
             raise ValueError(
-                f"Unknown TTS provider: {self.provider}. Supported: pyttsx3"
+                f"Unknown TTS provider: {self.provider}. "
+                f"Supported: pyttsx3, piper"
             )

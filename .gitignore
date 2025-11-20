@@ -50,4 +50,8 @@ Thumbs.db
 .env
 .env.local
 
+# TTS Models (large binary files)
+models/tts/piper/*.onnx
+models/tts/piper/*.onnx.json
+
 .serena

@@ -20,8 +20,9 @@ dependencies = [
     # PDF parsing for questionnaires
     "pypdf>=4.0.0",
 
-    # Text-to-Speech (Phase 2)
+    # Text-to-Speech (Phase 2 & Phase 7)
     "pyttsx3>=2.90",
+    "piper-tts>=1.2.0",
 
     # Speech-to-Text (Phase 3)
     "openai-whisper>=20231117",

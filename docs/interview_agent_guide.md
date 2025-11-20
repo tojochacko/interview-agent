@@ -160,10 +160,16 @@ python -m conversation_agent.cli test-audio --stt-test
 Customize settings via environment variables:
 
 ```bash
-# TTS Configuration
-export TTS_RATE=150                 # Words per minute (50-400)
-export TTS_VOLUME=0.9               # Volume (0.0-1.0)
-export TTS_VOICE="voice_id"         # Specific voice ID
+# TTS Configuration (Piper - default, high-quality neural voice)
+export TTS_PROVIDER=piper                    # Provider: piper (default) or pyttsx3 (fallback)
+export TTS_VOLUME=0.9                        # Volume (0.0-1.0)
+export TTS_PIPER_MODEL_PATH=models/tts/piper/en_US-lessac-medium.onnx
+export TTS_PIPER_SAMPLE_RATE=22050           # Sample rate in Hz
+
+# TTS Configuration (pyttsx3 - fallback, system TTS)
+export TTS_PROVIDER=pyttsx3                  # Switch to system TTS if needed
+export TTS_RATE=150                          # Words per minute (50-400, pyttsx3 only)
+export TTS_VOICE="voice_id"                  # Specific voice ID (pyttsx3 only)
 
 # STT Configuration
 export STT_MODEL_SIZE=base          # tiny|base|small|medium|large
@@ -175,6 +181,26 @@ export EXPORT_OUTPUT_DIRECTORY="./transcripts"
 export EXPORT_INCLUDE_METADATA=true
 export EXPORT_CSV_ENCODING=utf-8
 ```
+
+### TTS Provider Selection
+
+The agent supports two TTS providers:
+
+| Provider | Quality | Speed | Notes |
+|----------|---------|-------|-------|
+| **Piper** (default) | 9/10 - Neural, natural | Fast (RTF ~0.5) | High-quality neural voice, ~60MB model |
+| **pyttsx3** (fallback) | 1/10 - Robotic | Very fast | System TTS, no downloads needed |
+
+**Switching providers:**
+```bash
+# Use Piper (default, high-quality)
+export TTS_PROVIDER=piper
+
+# Use pyttsx3 (if Piper has issues)
+export TTS_PROVIDER=pyttsx3
+```
+
+**Note**: Piper models are automatically included in `models/tts/piper/`. On first use, the agent will use the pre-downloaded `en_US-lessac-medium` voice.
 
 ### Whisper Model Selection
 

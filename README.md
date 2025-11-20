@@ -5,6 +5,7 @@ A voice-based conversational agent that conducts interviews using PDF questionna
 ## Features
 
 - 🎤 **Voice-based interviews** using speech-to-text and text-to-speech
+- 🎙️ **High-quality neural voice** (9/10 quality) using Piper TTS
 - 📄 **PDF questionnaire parsing** (one question per line format)
 - 🗣️ **Natural conversation** with support for repeat, clarify, and skip commands
 - 💾 **CSV export** with structured data and metadata
@@ -53,10 +54,13 @@ pip install -e ".[dev]"
 
 This installs all dependencies including:
 - `pypdf` - PDF parsing
-- `pyttsx3` - Text-to-speech (offline)
+- `piper-tts` - Neural text-to-speech (default, high-quality)
+- `pyttsx3` - System text-to-speech (fallback option)
 - `openai-whisper` - Speech-to-text (local)
 - `pyaudio` - Audio I/O
 - `click` - CLI interface
+
+**Note**: Piper TTS models (~60MB) will be automatically downloaded on first use to `models/tts/piper/`.
 
 ## Usage
 
