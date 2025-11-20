@@ -120,13 +120,17 @@ class TestInterviewOrchestrator:
 
         progress = orchestrator.get_progress()
 
-        assert "total_questions" in progress
+        assert "total" in progress
+        assert "answered" in progress
+        assert "skipped" in progress
         assert "completed" in progress
         assert "remaining" in progress
         assert "percent_complete" in progress
 
         assert progress["completed"] == 0
-        assert progress["remaining"] == progress["total_questions"]
+        assert progress["answered"] == 0
+        assert progress["skipped"] == 0
+        assert progress["remaining"] == progress["total"]
         assert progress["percent_complete"] == 0.0
 
     def test_get_progress_partial(self, mock_tts, mock_stt, sample_pdf_path):
@@ -141,6 +145,15 @@ class TestInterviewOrchestrator:
 
         progress = orchestrator.get_progress()
 
+        # Verify all keys exist (CLI depends on these)
+        assert "total" in progress
+        assert "answered" in progress
+        assert "skipped" in progress
+        assert "completed" in progress
+        assert "remaining" in progress
+        assert "percent_complete" in progress
+
+        assert progress["total"] == total
         assert progress["completed"] == total // 2
         assert progress["remaining"] == total - (total // 2)
         assert 0 < progress["percent_complete"] < 100
@@ -157,6 +170,15 @@ class TestInterviewOrchestrator:
 
         progress = orchestrator.get_progress()
 
+        # Verify all keys exist (CLI depends on these)
+        assert "total" in progress
+        assert "answered" in progress
+        assert "skipped" in progress
+        assert "completed" in progress
+        assert "remaining" in progress
+        assert "percent_complete" in progress
+
+        assert progress["total"] == total
         assert progress["completed"] == total
         assert progress["remaining"] == 0
         assert progress["percent_complete"] == 100.0

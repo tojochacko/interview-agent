@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
+from conversation_agent.config import NormalizationConfig
 from conversation_agent.core.audio import AudioManager
 from conversation_agent.core.conversation_state import (
     ConversationState,
@@ -92,6 +93,10 @@ class InterviewOrchestrator:
         self.audio_manager = AudioManager()
         self.state_machine = ConversationStateMachine()
         self.intent_recognizer = IntentRecognizer()
+
+        # Initialize text normalizer for structured data (emails, phones, etc.)
+        norm_config = NormalizationConfig()
+        self.text_normalizer = norm_config.get_normalizer()  # None if disabled
 
         # Load questions from PDF
         parser = PDFQuestionParser()
@@ -430,6 +435,10 @@ class InterviewOrchestrator:
 
         user_text = result.get("text", "").strip()
 
+        # Apply text normalization for structured data (emails, phones, etc.)
+        if user_text and self.text_normalizer:
+            user_text = self.text_normalizer.normalize(user_text)
+
         # Check for Whisper hallucinations (common false positives)
         WHISPER_HALLUCINATIONS = [
             "you", "thank you", "thanks", ".", "...",
@@ -582,11 +591,18 @@ class InterviewOrchestrator:
         """
         total = len(self.questions)
         completed = self.current_question_index
+
+        # Count answered vs skipped from session turns
+        answered = sum(1 for turn in self.session.turns if not turn.skipped)
+        skipped = sum(1 for turn in self.session.turns if turn.skipped)
+
         remaining = total - completed
         percent = (completed / total * 100) if total > 0 else 0
 
         return {
-            "total_questions": total,
+            "total": total,
+            "answered": answered,
+            "skipped": skipped,
             "completed": completed,
             "remaining": remaining,
             "percent_complete": round(percent, 1),
