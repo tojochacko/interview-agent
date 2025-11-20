@@ -193,10 +193,16 @@ export TTS_RATE=150                 # Speech rate (50-400 words/min)
 export TTS_VOLUME=0.9               # Volume (0.0-1.0)
 export TTS_VOICE="voice_id"         # Specific voice ID
 
-# STT Configuration
+# STT Configuration (Whisper - all platforms)
+export STT_PROVIDER=whisper         # whisper (all platforms) or parakeet (Linux/Windows only)
 export STT_MODEL_SIZE=base          # tiny|base|small|medium|large
 export STT_LANGUAGE=en              # Language code
 export STT_DEVICE=cpu               # cpu or cuda (for GPU)
+
+# Parakeet STT (Linux/Windows only - not available on macOS)
+# export STT_PROVIDER=parakeet
+# export STT_PARAKEET_MODEL=nvidia/parakeet-tdt-0.6b-v3
+# export STT_PARAKEET_ENABLE_TIMESTAMPS=true
 
 # Text Normalization (Structured Data)
 export NORMALIZATION_ENABLED=true         # Enable/disable normalization

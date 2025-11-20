@@ -43,6 +43,10 @@ dev = [
     "fpdf2>=2.7.0",  # For generating test PDFs
 ]
 
+parakeet = [
+    "nemo_toolkit[asr]>=1.23.0; sys_platform == 'linux' or sys_platform == 'win32'",  # Nvidia Parakeet STT provider (Linux/Windows only)
+]
+
 [build-system]
 requires = ["setuptools>=68.0.0", "wheel"]
 build-backend = "setuptools.build_meta"

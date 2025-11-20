@@ -10,11 +10,15 @@ from unittest.mock import MagicMock, Mock, patch
 import numpy as np
 import pytest
 
-# Mock whisper module before importing our code
+# Mock whisper and nemo modules before importing our code
 sys.modules["whisper"] = MagicMock()
+sys.modules["nemo"] = MagicMock()
+sys.modules["nemo.collections"] = MagicMock()
+sys.modules["nemo.collections.asr"] = MagicMock()
+sys.modules["nemo.collections.asr.models"] = MagicMock()
 
-from conversation_agent.config import STTConfig
-from conversation_agent.providers.stt import STTError, STTProvider, WhisperProvider
+from conversation_agent.config import STTConfig  # noqa: E402
+from conversation_agent.providers.stt import STTError, STTProvider, WhisperProvider  # noqa: E402
 
 
 class TestSTTProviderInterface:
@@ -356,3 +360,50 @@ class TestSTTConfig:
         assert config.model_size == "large"
         assert config.language == "de"
         assert config.device == "cuda"
+
+    @patch("nemo.collections.asr.models.ASRModel.from_pretrained")
+    def test_get_provider_parakeet(self, mock_from_pretrained):
+        """Test getting Parakeet provider from config."""
+        mock_model = Mock()
+        mock_from_pretrained.return_value = mock_model
+
+        config = STTConfig(provider="parakeet")
+        provider = config.get_provider()
+
+        from conversation_agent.providers.stt import ParakeetProvider
+
+        assert isinstance(provider, ParakeetProvider)
+
+    def test_parakeet_config_defaults(self):
+        """Test Parakeet config default values."""
+        config = STTConfig(provider="parakeet")
+
+        assert config.parakeet_model == "nvidia/parakeet-tdt-0.6b-v3"
+        assert config.parakeet_enable_timestamps is True
+        assert config.parakeet_local_attention is False
+
+    def test_parakeet_config_env_vars(self, monkeypatch):
+        """Test Parakeet config from environment variables."""
+        monkeypatch.setenv("STT_PROVIDER", "parakeet")
+        monkeypatch.setenv("STT_PARAKEET_MODEL", "nvidia/parakeet-rnnt-1.1b")
+        monkeypatch.setenv("STT_PARAKEET_ENABLE_TIMESTAMPS", "false")
+        monkeypatch.setenv("STT_PARAKEET_LOCAL_ATTENTION", "true")
+
+        config = STTConfig()
+
+        assert config.provider == "parakeet"
+        assert config.parakeet_model == "nvidia/parakeet-rnnt-1.1b"
+        assert config.parakeet_enable_timestamps is False
+        assert config.parakeet_local_attention is True
+
+    @patch("nemo.collections.asr.models.ASRModel.from_pretrained")
+    def test_get_provider_parakeet_initialization_error(self, mock_from_pretrained):
+        """Test Parakeet provider initialization error."""
+        mock_from_pretrained.side_effect = STTError("Model load failed")
+
+        config = STTConfig(provider="parakeet")
+
+        with pytest.raises(ValueError) as exc_info:
+            config.get_provider()
+
+        assert "Failed to initialize Parakeet provider" in str(exc_info.value)

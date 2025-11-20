@@ -20,6 +20,9 @@ class STTConfig(BaseSettings):
         STT_SAMPLE_RATE: Audio sample rate (default: 16000)
         STT_SILENCE_THRESHOLD: Silence detection threshold (default: 0.01)
         STT_SILENCE_DURATION: Silence duration to stop (default: 2.0)
+        STT_PARAKEET_MODEL: Parakeet model name (default: "nvidia/parakeet-tdt-0.6b-v3")
+        STT_PARAKEET_ENABLE_TIMESTAMPS: Enable Parakeet timestamps (default: True)
+        STT_PARAKEET_LOCAL_ATTENTION: Use local attention for long audio (default: False)
 
     Example:
         # Use defaults
@@ -42,7 +45,7 @@ class STTConfig(BaseSettings):
 
     provider: str = Field(
         default="whisper",
-        description="STT provider to use (whisper, etc.)",
+        description="STT provider to use (whisper, parakeet)",
     )
 
     model_size: str = Field(
@@ -89,6 +92,22 @@ class STTConfig(BaseSettings):
         description="Maximum recording duration (seconds)",
     )
 
+    # Parakeet-specific configuration
+    parakeet_model: str = Field(
+        default="nvidia/parakeet-tdt-0.6b-v3",
+        description="Parakeet model name from HuggingFace",
+    )
+
+    parakeet_enable_timestamps: bool = Field(
+        default=True,
+        description="Enable word/segment timestamps for Parakeet",
+    )
+
+    parakeet_local_attention: bool = Field(
+        default=False,
+        description="Use local attention for long audio (Parakeet)",
+    )
+
     def get_provider(self):
         """Get configured STT provider instance.
 
@@ -98,9 +117,15 @@ class STTConfig(BaseSettings):
         Raises:
             ValueError: If provider name is not recognized.
         """
-        from conversation_agent.providers.stt import STTError, WhisperProvider
+        from conversation_agent.providers.stt import (
+            ParakeetProvider,
+            STTError,
+            WhisperProvider,
+        )
 
-        if self.provider.lower() == "whisper":
+        provider_name = self.provider.lower()
+
+        if provider_name == "whisper":
             try:
                 provider = WhisperProvider(
                     model_size=self.model_size,
@@ -110,7 +135,20 @@ class STTConfig(BaseSettings):
                 return provider
             except STTError as e:
                 raise ValueError(f"Failed to initialize Whisper provider: {e}") from e
+
+        elif provider_name == "parakeet":
+            try:
+                provider = ParakeetProvider(
+                    model_name=self.parakeet_model,
+                    language=self.language,
+                    enable_timestamps=self.parakeet_enable_timestamps,
+                    use_local_attention=self.parakeet_local_attention,
+                )
+                return provider
+            except STTError as e:
+                raise ValueError(f"Failed to initialize Parakeet provider: {e}") from e
+
         else:
             raise ValueError(
-                f"Unknown STT provider: {self.provider}. Supported: whisper"
+                f"Unknown STT provider: {self.provider}. Supported: whisper, parakeet"
             )
