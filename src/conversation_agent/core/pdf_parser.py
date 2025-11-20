@@ -74,7 +74,7 @@ class PDFQuestionParser:
 
         questions = self._extract_questions(reader)
         logger = logging.getLogger(__name__)
-        logger.info(f"Questions to ask: {questions}")
+        logger.debug(f"Questions to ask: {questions}")
 
         if not questions:
             raise PDFParseError("No valid questions found in PDF")

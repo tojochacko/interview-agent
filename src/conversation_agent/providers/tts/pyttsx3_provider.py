@@ -105,15 +105,18 @@ class Pyttsx3Provider(TTSProvider):
                 # Estimate speech duration based on text length and rate
                 # Average word length: 5 characters + 1 space = 6 chars
                 # Rate is in words per minute
-                rate = self.engine.getProperty("rate") or 175
+                rate = self.engine.getProperty("rate") or 150
                 estimated_words = len(text) / 6.0
                 estimated_seconds = (estimated_words / rate) * 60.0
-                # Add 0.5s buffer for engine overhead
-                timeout = estimated_seconds + 0.5
+
+                # Dynamic buffer: 20% overhead + minimum 1s for engine startup
+                # Longer texts need proportionally more time for natural pauses
+                buffer = max(1.0, estimated_seconds * 0.2)
+                timeout = estimated_seconds + buffer
 
                 logger.debug(
                     f"Estimated speech duration: {estimated_seconds:.2f}s "
-                    f"(timeout: {timeout:.2f}s)"
+                    f"(buffer: {buffer:.2f}s, timeout: {timeout:.2f}s)"
                 )
 
                 # Iterate for the estimated duration

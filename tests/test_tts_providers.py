@@ -195,7 +195,7 @@ class TestTTSConfig:
 
         assert config.provider == "pyttsx3"
         assert config.voice is None
-        assert config.rate == 175
+        assert config.rate == 150
         assert config.volume == 0.9
 
     def test_config_override(self):

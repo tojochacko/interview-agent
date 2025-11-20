@@ -54,7 +54,7 @@ class TTSConfig(BaseSettings):
     )
 
     rate: int = Field(
-        default=175,
+        default=150,
         ge=50,
         le=400,
         description="Speech rate in words per minute (50-400)",

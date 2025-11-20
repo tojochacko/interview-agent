@@ -96,7 +96,7 @@ def start(
         tts_config = TTSConfig(voice="com.apple.voice.Aman")
         if tts_rate:
             tts_config.rate = tts_rate
-        logger.debug(f"TTS config: rate={tts_config.rate}, volume={tts_config.volume}")
+        logger.info(f"TTS config: rate={tts_config.rate}, volume={tts_config.volume}")
 
         # Configure STT
         stt_config = STTConfig(
@@ -104,7 +104,7 @@ def start(
             )
         if stt_model:
             stt_config.model_size = stt_model
-        logger.debug(f"STT config: model={stt_config.model_size}, language={stt_config.language}")  # noqa: E501
+        logger.info(f"STT config: model={stt_config.model_size}, language={stt_config.language}")  # noqa: E501
 
         # Initialize providers
         click.echo("\nInitializing speech systems...")

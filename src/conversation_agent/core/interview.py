@@ -169,7 +169,7 @@ class InterviewOrchestrator:
             # Record audio from microphone with shorter silence detection
             audio_data = self.audio_manager.record_until_silence(
                 silence_threshold=0.005,  # Slightly less sensitive to noise
-                silence_duration=2.0,     # 1 second of silence (faster response)
+                silence_duration=2.0,     # 2 seconds of silence (faster response)
             )
             # Log audio data details
             audio_duration = len(audio_data) / (
